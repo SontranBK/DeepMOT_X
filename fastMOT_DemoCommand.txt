@@ -1,0 +1,18 @@
+
+Command line for running demo with app.py
+
+I) For reading input saved video and writing output video
+
+# for yolo-x
+
+sudo python3 app_x.py -i /home/minh/Car_tracking_Jetson/YOLOX/Test_data/video_data/03.mp4 -o /home/minh/fastMOT_X/FastMOT/Test_output/03.mp4 -m
+
+# for previous version of yolo
+
+sudo python3 app.py -i /home/minh/Car_tracking_Jetson/YOLOX/Test_data/video_data/03.mp4 -o /home/minh/FastMOT_normal/fastmot/Test_outputs/03.mp4 -m
+
+
+II) For reading input streamed video and writing output video
+
+sudo python3 app_x.py -i rtsp://admin:namphong1A@192.168.1.77 -o /home/minh/fastMOT_X/FastMOT/Test_output/stream.mp4 -m
+
