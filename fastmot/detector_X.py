@@ -52,7 +52,7 @@ class YOLOXDetector:
 #   Step 0: Load engine => create stream => create context from stream
 ########################################################################################################
 
-    def __init__(self):
+    def __init__(self,class_ids):
         #load engine 
         engine_path = '/home/minh/Car_tracking_Jetson/YOLOX/demo/TensorRT/cpp/model_trt.engine'
         runtime = trt.Runtime(TRT_LOGGER)
@@ -64,6 +64,13 @@ class YOLOXDetector:
         
         #generate the grids, strides to store output from GPU (do_inference function)
         self.grids, self.strides, self.total_cells = self.generate_grids_and_stride_numpy(STRIDES)
+        
+        self.label_mask = np.zeros(NUM_CLASSES, dtype=np.bool_)
+        try:
+            self.label_mask[tuple(class_ids),] = True
+        except IndexError as err:
+            raise ValueError('Unsupported class IDs') from err
+        #print(self.label_mask[tuple(class_ids),])
         
 ########################################################################################################
 #   Step 1: Preprocess image
@@ -173,31 +180,34 @@ class YOLOXDetector:
         #print("shape of output before nms: "+str(outputs.shape))
         #print(f"Number of boxes before nms: {len(outputs)}")
         outputs = self.nms(outputs, NMS_THRESH, IOU_THRESH)
-        #print(f"Number of boxes after nms: {len(outputs)}")    
-        outputs = self.rescaled_box_corners(outputs, scale)
-
-
+        #print(f"Number of boxes after nms: {len(outputs)}")
+        
         detections = []
-        for i in range(len(outputs)):
-            tlbr = np.empty(4)
-            tlbr[0] = int(outputs[i,0])
-            tlbr[1] = int(outputs[i,2])
-            tlbr[2] = int(outputs[i,1])
-            tlbr[3] = int(outputs[i,3])                 
-            label = int(outputs[i, 5])
-            conf = outputs[i,4]
-            detections.append((tlbr, label, conf))
+        if len(outputs) > 0:
+            outputs = self.rescaled_box_corners(outputs, scale)
+            for i in range(len(outputs)):
+                if self.label_mask[int(outputs[i, 5])]:
+                    tlbr = np.empty(4)
+                    tlbr[0] = int(outputs[i,0])
+                    tlbr[1] = int(outputs[i,2])
+                    tlbr[2] = int(outputs[i,1])
+                    tlbr[3] = int(outputs[i,3])                 
+                    label = int(outputs[i, 5])
+                    conf = outputs[i,4]
+                    detections.append((tlbr, label, conf))
 
-        #print(f'detections before np.fromiter: {detections}, type: {type(detections)}, shape: {len(detections)}')
+            #print(f'detections before np.fromiter: {detections}, type: {type(detections)}, shape: {len(detections)}')
 
-        detections = np.fromiter(detections, DET_DTYPE, len(detections)).view(np.recarray)
+            detections = np.fromiter(detections, DET_DTYPE, len(detections)).view(np.recarray)
 
-        #print(f'detections: {detections}, type: {type(detections)}, shape: {detections.shape}')            
+            #print(f'detections: {detections}, type: {type(detections)}, shape: {detections.shape}')            
 
-        #np.set_printoptions(precision=3,suppress=True) #nicely format the output
-        #print(f'output: {np.around(outputs,decimals=2)}, type: {type(outputs)}, shape: {outputs.shape}')  
+            #np.set_printoptions(precision=3,suppress=True) #nicely format the output
+            #print(f'output: {np.around(outputs,decimals=2)}, type: {type(outputs)}, shape: {outputs.shape}')  
 
-        return detections
+            return detections
+        else:
+            return np.fromiter(detections, DET_DTYPE, len(detections)).view(np.recarray)
     
 ########################################################################################################
 #   (Inside Step 4) Step 4.1: generate_yolox_proposals
@@ -271,10 +281,16 @@ class YOLOXDetector:
             #print(delete_idx)
             for i in accept_idx:
                 valids.append(valid[i])
+                
+        #print(f'valid nms: {valids}')
         
-
-        return np.vstack(valids)
-        #print(len(valids))
+        try:
+            return np.vstack(valids)
+            #print(len(valids))
+        except:
+            #print("ERRRORRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            return []
+            
 
 
 ########################################################################################################
