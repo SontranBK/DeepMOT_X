@@ -79,7 +79,6 @@ def main():
 
     logger.info('Starting video capture...')
     stream.start_capture()
-    frame_count = 0
     try:
         with Profiler('app') as prof:
             while not args.show or cv2.getWindowProperty('Video', 0) >= 0:
@@ -92,6 +91,7 @@ def main():
                         break
                 
                 if args.mot:
+                    # run multiple objects tracking
                     mot.step(frame)
                     if txt is not None:
                         for track in mot.visible_tracks():
@@ -100,6 +100,8 @@ def main():
                             w, h = br - tl + 1
                             txt.write(f'{mot.frame_count},{track.trk_id},{tl[0]:.6f},{tl[1]:.6f},'
                                       f'{w:.6f},{h:.6f},-1,-1,-1\n')
+                    # perform vehicles counting and draw line
+                    mot.vehicle_counting_draw_line(frame)
 
                 if args.show:
                     cv2.imshow('Video', frame)
@@ -108,8 +110,6 @@ def main():
                     cv2.waitKey(0)
                 if args.output_uri is not None:
                     stream.write(frame)
-                print (f'frame no.: {frame_count}')
-                frame_count += 1
     except KeyboardInterrupt:
         print('\nUser interrupted, terminating...')
     finally:
