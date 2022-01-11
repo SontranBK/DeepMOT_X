@@ -9,7 +9,9 @@ from .flow import Flow
 from .kalman_filter import MeasType, KalmanFilter
 from .utils.distance import Metric, cdist, iou_dist
 from .utils.matching import linear_assignment, greedy_match, fuse_motion, gate_cost
-from .utils.rect import as_tlbr, to_tlbr, ios, bbox_ious, find_occluded
+from .utils.rect import as_tlbr, to_tlbr, ios, bbox_ious, find_occluded, get_center
+from collections import Counter, deque
+import math
 
 
 LOGGER = logging.getLogger(__name__)
@@ -105,6 +107,14 @@ class MultiTracker:
 
         self.klt_bboxes = {}
         self.homography = None
+        
+        # These below variable used for vehicle counting
+        self.already_track_id = []
+        self.memory = {}
+        self.already_counted = deque(maxlen=50)
+        self.total_counter = 0
+        self.up_count = 0
+        self.down_count = 0
 
     def reset(self, dt):
         """Reset the tracker for new input context.
@@ -182,9 +192,24 @@ class MultiTracker:
                 if track.confirmed:
                     LOGGER.info(f"{'Out:':<14}{track}")
                 self._mark_lost(trk_id)
-
+    
+    # used in function _intersect
+    def _ccw(self, A,B,C):
+        return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
+    
+    # used to find intersection between track and line in vehicles counting
+    def _intersect(self, A, B, C, D):
+        return self._ccw(A,C,D) != self._ccw(B, C, D) and self._ccw(A,B,C) != self._ccw(A,B,D)
+    
+    # find angle to determine if track goes up or down
+    def _vector_angle(self, midpoint, previous_midpoint):
+        x = midpoint[0] - previous_midpoint[0]
+        y = midpoint[1] - previous_midpoint[1]
+        return math.degrees(math.atan2(y, x))
+    
     def update(self, frame_id, detections, embeddings):
         """Associates detections to tracklets based on motion and feature embeddings.
+        Also run vehicles counting
 
         Parameters
         ----------
@@ -256,8 +281,13 @@ class MultiTracker:
             track.reinstate(frame_id, det.tlbr, state, embeddings[det_id])
             self.tracks[trk_id] = track
 
-        # update matched tracks
+        line = [(0, 1000), (1440, 1000)]
+        
+        # update matched tracks and perform vehicles counting
         for trk_id, det_id in matches:
+            
+            """ Update matched tracks """
+            
             track = self.tracks[trk_id]
             det = detections[det_id]
             mean, cov = self.kf.update(*track.state, det.tlbr, MeasType.DETECTOR)
@@ -271,6 +301,45 @@ class MultiTracker:
                     LOGGER.info(f"{'Out:':<14}{track}")
                 self._mark_lost(trk_id)
             track.add_detection(frame_id, next_tlbr, (mean, cov), embeddings[det_id], is_valid)
+            
+            """ Perform vehicles counting """
+            
+            bbox = det.tlbr
+            #print(f"bbox :{bbox}")
+            midpoint = get_center(bbox)
+            #print(f"midpoint: {midpoint}")
+            origin_midpoint = (midpoint[0], 1 - midpoint[1])
+
+
+            if track.trk_id not in self.already_track_id:
+                self.memory[track.trk_id] = deque(maxlen=2)
+                self.already_track_id.append(track.trk_id)
+
+            #print(f"memory: {self.memory}")
+            self.memory[track.trk_id].append(midpoint)
+            #print(f"track.trk_id: {track.trk_id}")
+            #print(f"memory[track.trk_id]: {self.memory[track.trk_id]}")
+            previous_midpoint = self.memory[track.trk_id][0]
+            #print(f"previous midpoint: {previous_midpoint}")
+            origin_previous_midpoint = (previous_midpoint[0], 1 - previous_midpoint[1])
+            #print(f"track id not in already ounted:{track.trk_id not in already_counted}")
+            if self._intersect(midpoint, previous_midpoint, line[0], line[1]) and track.trk_id not in self.already_counted:
+                self.total_counter += 1
+                #print(f"already counted:{self.already_counted}")
+
+                self.already_counted.append(track.trk_id)  # Set already counted for ID to true.
+                #print(f" origin midpoint : {origin_midpoint}")
+                #print(f" origin previous midpoint : {origin_previous_midpoint}")
+                angle = self._vector_angle(origin_midpoint, origin_previous_midpoint)
+                
+                if angle > 0:
+                    self.up_count += 1
+                if angle < 0:
+                    self.down_count += 1
+
+
+            #print(f" Up count : {self.up_count}")
+            #print(f"Down_count : {self.down_count}")
 
         # clean up lost tracks
         for trk_id in u_trk_ids:

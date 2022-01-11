@@ -26,7 +26,7 @@ class MOT_X:
     def __init__(self, size,
                  detector_type='YOLO',
                  detector_frame_skip=5,
-                 class_ids=(1,2,3,4,6,8),
+                 class_ids=(),
                  ssd_detector_cfg=None,
                  yolo_detector_cfg=None,
                  public_detector_cfg=None,
@@ -71,13 +71,12 @@ class MOT_X:
         self.draw = draw
 	
         """
-        class_ids: [0, 2, 3, 4, 6, 8]
-        0: u'__background__',
-        2: u'bicycle',
-        3: u'car',
-        4: u'motorcycle',
-        6: u'bus',
-        8: u'truck'
+        class_ids: [2, 3, 4, 6, 8]
+        1: u'bicycle',
+        2: u'car',
+        3: u'motorcycle',
+        5: u'bus',
+        7: u'truck'
         """
         if ssd_detector_cfg is None:
             ssd_detector_cfg = SimpleNamespace()
@@ -95,7 +94,7 @@ class MOT_X:
             raise ValueError('Number of feature extractors must match length of class IDs')
 
         LOGGER.info('Loading detector model...')
-        self.detector = YOLOXDetector()
+        self.detector = YOLOXDetector(self.class_ids)
         
         
 
@@ -104,6 +103,13 @@ class MOT_X:
         self.tracker = MultiTracker(self.size, self.extractors[0].metric, **vars(tracker_cfg))
         self.visualizer = Visualizer(**vars(visualizer_cfg))
         self.frame_count = 0
+    
+    def vehicle_counting_draw_line(self, frame):
+        cv2.line(frame, (0, 1000), (1440, 1000), (0, 0, 255), 2)
+        cv2.putText(frame, f"Total: {self.tracker.total_counter} ({self.tracker.up_count} up, {self.tracker.down_count} down)", (int(0.05 * frame.shape[1]), int(0.1 * frame.shape[0])), 0,
+                1.5e-3 * frame.shape[0], (0, 255, 255), 2)
+        
+
 
     def visible_tracks(self):
         """Retrieve visible tracks from the tracker
@@ -142,7 +148,7 @@ class MOT_X:
             output_of_detect_async, scale = self.detector.detect_async(frame)
             detections = self.detector.postprocess(output_of_detect_async, scale)
             
-            #print(f'detections: {detections}, type: {type(detections)}, shape: {detections.shape}')    
+            #print(f'detections: {detections}, type: {type(detections)}')    
             self.tracker.init(frame, detections)
         elif self.frame_count % self.detector_frame_skip == 0:
         
@@ -160,35 +166,35 @@ class MOT_X:
                 # Below line is for YOLO-X only:
                 detections = self.detector.postprocess(output_of_detect_async, scale)
 
-            #print(f'detections: {detections}, type: {type(detections)}, shape: {detections.shape}')    
+            #print(f'detections: {detections}, type: {type(detections)}')    
             #timestamp3 = time.time() #timestamp for measuring execution time of the system
             
             with Profiler('extract'):
                 
-                timestamp6 = time.time() #timestamp for measuring execution time of the system
+                #timestamp6 = time.time() #timestamp for measuring execution time of the system
                 
                 cls_bboxes = np.split(detections.tlbr, find_split_indices(detections.label))
                 for extractor, bboxes in zip(self.extractors, cls_bboxes):
                     extractor.extract_async(frame, bboxes)
                     
-                timestamp7 = time.time() #timestamp for measuring execution time of the system
+                #timestamp7 = time.time() #timestamp for measuring execution time of the system
                 
                 with Profiler('track', aggregate=True):
                     self.tracker.apply_kalman()
                     
-                timestamp8 = time.time() #timestamp for measuring execution time of the system
+                #timestamp8 = time.time() #timestamp for measuring execution time of the system
                     
                 embeddings = []
                 for extractor in self.extractors:
                     embeddings.append(extractor.postprocess())
                     
-                timestamp9 = time.time() #timestamp for measuring execution time of the system
+                #timestamp9 = time.time() #timestamp for measuring execution time of the system
                 
                 embeddings = np.concatenate(embeddings) if len(embeddings) > 1 else embeddings[0]
                 
                 
                 
-            timestamp4 = time.time() #timestamp for measuring execution time of the system
+            #timestamp4 = time.time() #timestamp for measuring execution time of the system
                             
             with Profiler('assoc'):
                 self.tracker.update(self.frame_count, detections, embeddings)
