@@ -1,7 +1,7 @@
 # DeepMOT_X
 [![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2FGeekAlexis%2FDeepMOT_X&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false)](https://hits.seeyoufarm.com) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![DOI](https://zenodo.org/badge/237143671.svg)](https://zenodo.org/badge/latestdoi/237143671)
 
-<img src="Test_output/cars_x.mp4" width="400"/> <img src="Test_output/05_x.mp4" width="400"/>
+<img src="assets/cars_x.gif" width="400"/> <img src="assets/Highway_x.gif" width="400"/>
 
 ## News
   - (11 Jan 2022) **v1.0.0-alpha release**. First version contains YOLOX and DeepSORT on Jetson Nano
