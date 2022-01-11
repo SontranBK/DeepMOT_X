@@ -173,14 +173,8 @@ DeepMOT_X also supports multi-class tracking. It is recommended to train a ReID 
  ## Citation
  If you find this repo useful in your project or research, please star and consider citing it:
  ```bibtex
-@software{yukai_yang_2020_4294717,
-  author       = {Yukai Yang},
-  title        = {{DeepMOT_X: High-Performance Multiple Object Tracking Based on Deep SORT and KLT}},
-  month        = nov,
-  year         = 2020,
-  publisher    = {Zenodo},
-  version      = {v1.0.0},
-  doi          = {10.5281/zenodo.4294717},
-  url          = {https://doi.org/10.5281/zenodo.4294717}
+@software{sontranbk_2022,
+  author       = {Tran Son, Nguyen Minh},
+  title        = {{DeepMOT_X: High-Performance Multiple Object Tracking Based on Deep SORT, YOLOX and KLT}},
 }
 ```
